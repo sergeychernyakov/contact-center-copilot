@@ -44,9 +44,11 @@ def _redact(text: str) -> tuple[str, list[str]]:
         redactions.append(m.group(1))
         return "agent [REDACTED_NAME]"
 
+    # SSN before PHONE: the phone pattern also matches SSN-shaped digit runs,
+    # so the more specific pattern must run first to label PII correctly.
     text = EMAIL_RE.sub(sub_email, text)
-    text = PHONE_RE.sub(sub_phone, text)
     text = SSN_RE.sub(sub_ssn, text)
+    text = PHONE_RE.sub(sub_phone, text)
     text = AGENT_RE.sub(sub_agent, text)
     return text, redactions
 
@@ -92,16 +94,11 @@ async def apply_guardrails(state: CopilotState) -> dict:
 
     # Escalate to HITL if Critic didn't pass OR tone issues found
     critic = state.get("critic_report")
-    needs_review = (
-        (critic is not None and not critic.passes)
-        or bool(tone_issues)
-    )
+    needs_review = (critic is not None and not critic.passes) or bool(tone_issues)
     if needs_review:
         cleaned.requires_human_review = True
         if tone_issues:
-            cleaned.review_reasons.append(
-                f"Tone issues detected: {', '.join(tone_issues)}"
-            )
+            cleaned.review_reasons.append(f"Tone issues detected: {', '.join(tone_issues)}")
         if critic and not critic.passes:
             cleaned.review_reasons.append(
                 f"Critic flagged: faithfulness={critic.faithfulness_score:.2f}"
@@ -112,8 +109,5 @@ async def apply_guardrails(state: CopilotState) -> dict:
         "pii_redactions": redactions,
         "guardrails_passed": not tone_issues,
         "requires_human_review": needs_review,
-        "log": [
-            f"[Guardrails] {len(redactions)} PII redacted, "
-            f"{len(tone_issues)} tone issues"
-        ],
+        "log": [f"[Guardrails] {len(redactions)} PII redacted, {len(tone_issues)} tone issues"],
     }
