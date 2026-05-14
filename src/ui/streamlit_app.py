@@ -40,10 +40,10 @@ with st.sidebar:
     st.divider()
     st.markdown(
         "**Pipeline:**\n"
-        "1. Schema Inspector (Haiku)\n"
+        "1. Schema Inspector (fast LLM)\n"
         "2. Pandas Extractor (deterministic)\n"
         "3. Benchmark Retriever (FAISS + BM25)\n"
-        "4. Reporter (Sonnet)\n"
+        "4. Reporter (heavy LLM)\n"
         "5. Critic → loop if needed\n"
         "6. Guardrails (PII / tone)"
     )

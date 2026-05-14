@@ -60,9 +60,9 @@ The pipeline supports multiple LLM providers via a single env flag. Adding a new
 
 Switch via `LLM_PROVIDER=ollama`, `LLM_PROVIDER=groq`, or `LLM_PROVIDER=anthropic` in `.env`. The default is **Ollama** — fully local, no API key — once you `brew install ollama` and `ollama pull qwen2.5:14b`. **Groq** is a fast hosted free-tier alternative.
 
-> **Why Groq?** Inference on LPU chips is **300-800 tokens/sec** — narrative generation completes in 2-4 seconds rather than 15-20. For demo and iteration that's a huge UX win. For production with sensitive client data, Azure-hosted Claude or Azure OpenAI is the better choice — and the abstraction makes the swap trivial.
+> **Why Ollama by default?** It runs fully local — no API key, no data leaving the machine, no per-token cost — so the repo is clone-and-run and sensitive client data never leaves the box. The trade-off is speed: a 14B model on a laptop takes several minutes per report. **Groq** is the fast alternative (inference on LPU chips at 300-800 tokens/sec — seconds, not minutes), and for production with sensitive data, Azure-hosted Claude or Azure OpenAI is the better call. The provider abstraction makes any of these a one-line `.env` swap.
 
-Get a free Groq key at https://console.groq.com (Google account, 1 minute).
+Want demo speed? Get a free Groq key at https://console.groq.com (Google account, 1 minute) and set `LLM_PROVIDER=groq` in `.env`.
 
 ---
 
@@ -70,8 +70,8 @@ Get a free Groq key at https://console.groq.com (Google account, 1 minute).
 
 | Layer | Tool | Why |
 |---|---|---|
-| LLM (default) | Llama 3.3 70B / 3.1 8B via Groq | Free, very fast, OpenAI-compatible API |
-| LLM (alt) | Claude Sonnet 4.6 + Haiku 4.5 via Anthropic | Higher quality, Pydantic-native structured output |
+| LLM (default) | Qwen2.5 14B via Ollama | Free, fully local, no API key — clone-and-run |
+| LLM (alt) | Llama 3.1/3.3 via Groq · Claude via Anthropic | Hosted speed (Groq) or higher quality (Anthropic) |
 | Embeddings | `sentence-transformers` (local) | Zero external API deps, self-contained Docker |
 | Vector store | FAISS | Local, fast, swappable to Azure AI Search via env config |
 | Orchestration | LangGraph | State, cycles, conditional edges, HITL |

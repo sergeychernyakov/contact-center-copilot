@@ -53,9 +53,7 @@ def _score_must_mention(state: dict, must: list[str]) -> float:
     if report is None:
         return 0.0
     text = (
-        report.executive_summary
-        + " ".join(report.key_findings)
-        + " ".join(report.recommendations)
+        report.executive_summary + " ".join(report.key_findings) + " ".join(report.recommendations)
     ).lower()
     if not must:
         return 1.0
@@ -71,9 +69,7 @@ async def run_case(case: dict) -> dict:
     expected = case["expected"]
     scores = {
         "numeric_accuracy": _score_numeric_accuracy(dict(state)),
-        "must_mention_coverage": _score_must_mention(
-            dict(state), expected.get("must_mention", [])
-        ),
+        "must_mention_coverage": _score_must_mention(dict(state), expected.get("must_mention", [])),
         "latency_seconds": round(duration, 2),
     }
     return {"id": case["id"], "scores": scores}
@@ -92,7 +88,7 @@ async def main(fail_on_regression: bool) -> int:
             result = await run_case(case)
             results.append(result)
             print(f"  ✓ {result['scores']}")
-        except Exception as exc:  # noqa: BLE001
+        except Exception as exc:
             print(f"  ✗ Failed: {exc}")
             results.append({"id": case["id"], "error": str(exc)})
 
@@ -107,11 +103,15 @@ async def main(fail_on_regression: bool) -> int:
                 f"{r['id']}: numeric_accuracy {r['scores']['numeric_accuracy']:.2f} "
                 f"< {thresholds['numeric_accuracy']}"
             )
-        if r["scores"]["latency_seconds"] > thresholds["p95_latency_seconds"]:
+        if r["scores"]["must_mention_coverage"] < thresholds["must_mention_coverage"]:
             regressions.append(
-                f"{r['id']}: latency {r['scores']['latency_seconds']}s "
-                f"> {thresholds['p95_latency_seconds']}s"
+                f"{r['id']}: must_mention_coverage "
+                f"{r['scores']['must_mention_coverage']:.2f} "
+                f"< {thresholds['must_mention_coverage']}"
             )
+    # latency_seconds is recorded for observability but not gated: it is
+    # provider-dependent (seconds on hosted APIs, minutes on local Ollama),
+    # so it tracks the deployment, not a code regression.
 
     # Persist results
     out_path = root / "last_run.json"

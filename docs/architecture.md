@@ -8,10 +8,10 @@ flowchart TD
 
     subgraph W[LangGraph workflow]
         direction TB
-        SI[Schema Inspector<br/>Haiku 4.5]
+        SI[Schema Inspector<br/>fast LLM]
         EX[Pandas Extractor<br/>deterministic]
         BR[Benchmark Retriever<br/>BM25 + FAISS + RRF]
-        RP[Reporter<br/>Sonnet 4.6]
+        RP[Reporter<br/>heavy LLM]
         CR{Critic<br/>faithfulness ≥ 0.85?}
         GR[Guardrails<br/>PII + tone]
 
@@ -71,10 +71,13 @@ The POC scale (a few hundred chunks) doesn't justify Pinecone/Weaviate
 infrastructure. The `vector_store.py` layer is intentionally thin so
 swapping to Azure AI Search is a one-file change (relevant for PwC's stack).
 
-### Why Anthropic Claude over OpenAI GPT-4o?
-- Better structured output adherence in our tests (lower retry rate)
-- Sonnet 4.6 + Haiku 4.5 tiering gives better cost/latency
-- Anthropic's `with_structured_output` integrates cleanly with Pydantic v2
+### Why a swappable LLM provider (Ollama / Groq / Anthropic)?
+The default is **Ollama** — fully local, no API key, no per-token cost, so the
+repo is clone-and-run and client data never leaves the machine. **Groq** is the
+fast hosted free-tier option; **Anthropic** is the quality option — best
+structured-output adherence and the cleanest Pydantic v2 integration. All three
+sit behind one factory in `src/agents/_llm.py`, selected by the `LLM_PROVIDER`
+env var, so matching a client's compliance stack is a one-line change.
 
 ### Why FastMCP?
 The Model Context Protocol is becoming the de-facto standard for AI tool
@@ -83,6 +86,14 @@ exposure. Wrapping our tools in FastMCP means any MCP-compatible client
 without bespoke integration code.
 
 ## Cost / latency profile (sample run on `data/sample_diagnostic.xlsx`)
+
+Same pipeline, two provider profiles — the abstraction is the only thing that changes.
+
+**Default — Ollama (local Qwen2.5 14B):** $0 per report, fully local and
+private. The trade-off is speed: on a laptop-class GPU the four reporter
+sections plus the critic pass take minutes, not seconds. Free and on-prem; slow.
+
+**Anthropic (Haiku 4.5 + Sonnet 4.6) — the hosted-quality profile:**
 
 | Node | Model | Avg latency | Avg cost |
 |---|---|---|---|
@@ -104,7 +115,7 @@ See [Challenge 4](challenge-4-loop-control.md) for how the loop is bounded.
 |---|---|---|
 | Vector DB | FAISS local | Azure AI Search w/ hybrid + semantic ranking |
 | Embeddings | sentence-transformers | Azure OpenAI `text-embedding-3-large` |
-| LLM provider | Anthropic direct | Azure-hosted Claude or OpenAI for compliance |
+| LLM provider | Ollama / Groq / Anthropic via env flag | Azure-hosted Claude or OpenAI for compliance |
 | Auth / multi-tenancy | none | Azure AD + per-client row-level security |
 | Observability | LangSmith optional | LangSmith + Application Insights mandatory |
 | Eval gate | manual run | scheduled + on every PR (LangSmith Datasets) |

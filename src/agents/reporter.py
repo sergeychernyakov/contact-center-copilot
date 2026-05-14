@@ -11,6 +11,7 @@ half-empty.
 
 from __future__ import annotations
 
+import asyncio
 import json
 
 from langchain_core.prompts import ChatPromptTemplate
@@ -152,14 +153,11 @@ async def generate_report(state: CopilotState) -> dict:
     }
 
     llm = get_heavy_llm(temperature=0.2)
-    prose: _ProseBlock = await (
-        _PROSE_PROMPT | llm_with_structured_output(llm, _ProseBlock)
-    ).ainvoke(context)
-    analysis: _AnalysisBlock = await (
-        _ANALYSIS_PROMPT | llm_with_structured_output(llm, _AnalysisBlock)
-    ).ainvoke(context)
-    roi: _RoiBlock = await (_ROI_PROMPT | llm_with_structured_output(llm, _RoiBlock)).ainvoke(
-        context
+    # Prose, benchmark analysis, and ROI are independent — generate them concurrently.
+    prose, analysis, roi = await asyncio.gather(
+        (_PROSE_PROMPT | llm_with_structured_output(llm, _ProseBlock)).ainvoke(context),
+        (_ANALYSIS_PROMPT | llm_with_structured_output(llm, _AnalysisBlock)).ainvoke(context),
+        (_ROI_PROMPT | llm_with_structured_output(llm, _RoiBlock)).ainvoke(context),
     )
     # Citations run last: feed them the claims that were actually generated.
     report_claims = "\n".join(

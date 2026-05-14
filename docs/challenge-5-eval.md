@@ -52,14 +52,16 @@ A single number ("quality") is meaningless. We track five:
 |---|---|---|
 | **Faithfulness** | RAGAS faithfulness | ≥ 0.85 |
 | **Numeric accuracy** | regex extract numbers, compare to source | = 1.00 |
+| **Must-mention coverage** | required KPIs named in the narrative | = 1.00 |
 | **Citation coverage** | % of claims with source attribution | ≥ 0.80 |
 | **Narrative quality** | Opus as LLM judge (1-5 scale) | ≥ 4.0 |
 | **Cost** | actual token spend | ≤ $0.10/report |
-| **P95 latency** | wall time | ≤ 30s |
 
 Different metrics catch different failure modes. A change might improve
 faithfulness while hurting narrative readability — without separate metrics
-you'd never notice.
+you'd never notice. Latency is recorded too, but not gated: it's
+provider-dependent (seconds on hosted APIs, minutes on local Ollama), so it
+tracks the deployment, not the code.
 
 ### 3. Regression gates in CI (`.github/workflows/ci.yml`)
 On every PR, the eval suite runs:

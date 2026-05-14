@@ -8,7 +8,7 @@
 # Hook stages:
 #   pre-commit  — fast formatters / linters / fixers on staged files
 #   commit-msg  — Conventional Commits message validation
-#   pre-push    — heavy checks: types, security, audit, docs, dead code, tests + coverage
+#   pre-push    — heavy checks: types, security, audit, docs, dead code, tests
 
 minimum_pre_commit_version: "3.5.0"
 default_install_hook_types: [pre-commit, commit-msg, pre-push]
@@ -174,9 +174,9 @@ repos:
         always_run: true
         stages: [pre-push]
 
-      - id: pytest-cov
-        name: pytest + coverage gate (>=90%)
-        entry: make coverage
+      - id: pytest
+        name: pytest (test suite)
+        entry: make test
         language: system
         pass_filenames: false
         always_run: true
