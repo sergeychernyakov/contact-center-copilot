@@ -5,11 +5,10 @@ typed via Pydantic so we can detect schema drift, validate LLM outputs,
 and avoid stringly-typed bugs.
 """
 
-from datetime import datetime
+from datetime import UTC, datetime
 from enum import Enum
 
 from pydantic import BaseModel, Field
-
 
 # ─── Schema inspection ──────────────────────────────────────────────────────
 
@@ -83,7 +82,7 @@ class MetricsSet(BaseModel):
     """
 
     metrics: list[Metric] = Field(default_factory=list)
-    extracted_at: datetime = Field(default_factory=datetime.utcnow)
+    extracted_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
     source_file: str = ""
 
     def to_dict(self) -> dict[str, float]:
