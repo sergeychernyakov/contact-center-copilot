@@ -32,9 +32,11 @@ st.caption(
 
 with st.sidebar:
     st.header("⚙️ Configuration")
+    # Only industries with a benchmark dataset in data/benchmarks/ — picking an
+    # unbacked industry would silently fall back to cross-industry data.
     industry = st.selectbox(
         "Industry",
-        ["banking", "retail", "healthcare", "telecom", "insurance", "cross_industry"],
+        ["banking", "retail", "cross_industry"],
         index=0,
     )
     st.divider()
