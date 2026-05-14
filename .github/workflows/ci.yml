@@ -31,4 +31,5 @@ jobs:
       - name: Pytest (unit tests, no LLM calls)
         run: pytest -q tests/ --ignore=tests/integration
         env:
-          ANTHROPIC_API_KEY: dummy-key-for-unit-tests
+          LLM_PROVIDER: groq
+          GROQ_API_KEY: dummy-key-for-unit-tests
