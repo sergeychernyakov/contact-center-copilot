@@ -38,8 +38,8 @@ class Settings(BaseSettings):
 
     # Models — defaults match the active provider (Ollama). Override per
     # provider via MODEL_FAST / MODEL_HEAVY in .env (see .env.example).
-    model_fast: str = Field(default="llama3.1:8b")
-    model_heavy: str = Field(default="llama3.1:8b")
+    model_fast: str = Field(default="qwen2.5:14b")
+    model_heavy: str = Field(default="qwen2.5:14b")
     embedding_model: str = Field(default="sentence-transformers/all-MiniLM-L6-v2")
 
     # Pipeline behaviour

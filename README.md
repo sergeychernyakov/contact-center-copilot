@@ -54,11 +54,11 @@ The pipeline supports multiple LLM providers via a single env flag. Adding a new
 
 | Provider | Default | Free? | Used for |
 |---|---|---|---|
-| **Ollama** | ✅ active | ✅ fully local, no key | any pulled model, e.g. Llama 3.1 8B |
+| **Ollama** | ✅ active | ✅ fully local, no key | any pulled model, e.g. Qwen2.5 14B |
 | **Groq** | optional | ✅ generous free tier | Llama 3.1 8B (fast), Llama 3.3 70B (heavy) |
 | **Anthropic** | optional | ❌ paid | Claude Haiku 4.5, Claude Sonnet 4.6 |
 
-Switch via `LLM_PROVIDER=ollama`, `LLM_PROVIDER=groq`, or `LLM_PROVIDER=anthropic` in `.env`. The default is **Ollama** — fully local, no API key — once you `brew install ollama` and `ollama pull llama3.1:8b`. **Groq** is a fast hosted free-tier alternative.
+Switch via `LLM_PROVIDER=ollama`, `LLM_PROVIDER=groq`, or `LLM_PROVIDER=anthropic` in `.env`. The default is **Ollama** — fully local, no API key — once you `brew install ollama` and `ollama pull qwen2.5:14b`. **Groq** is a fast hosted free-tier alternative.
 
 > **Why Groq?** Inference on LPU chips is **300-800 tokens/sec** — narrative generation completes in 2-4 seconds rather than 15-20. For demo and iteration that's a huge UX win. For production with sensitive client data, Azure-hosted Claude or Azure OpenAI is the better choice — and the abstraction makes the swap trivial.
 
@@ -93,7 +93,7 @@ cd contact-center-copilot
 
 # 1. Configure
 cp .env.example .env
-# Default provider is Ollama (free, local): brew install ollama && ollama pull llama3.1:8b
+# Default provider is Ollama (free, local): brew install ollama && ollama pull qwen2.5:14b
 # Or set LLM_PROVIDER=groq in .env with a free key from console.groq.com
 
 # 2a. Docker (recommended)
