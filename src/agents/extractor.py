@@ -14,12 +14,14 @@ import pandas as pd
 from ..graph.models import Metric, MetricsSet, MetricType
 from ..graph.state import CopilotState
 
-# Heuristic mapping of column name patterns to canonical metric types
+# Heuristic mapping of column name patterns to canonical metric types.
+# Abbreviations use (?<![a-z])X(?![a-z]) rather than \bX\b because `_` counts
+# as a regex word char — \baht\b would miss common names like "AHT_seconds".
 KEYWORD_MAP: dict[str, tuple[MetricType, str]] = {
-    r"\bfcr\b|first[\s_-]?call[\s_-]?resolution": (MetricType.FCR, "%"),
-    r"\baht\b|average[\s_-]?handle|handle[\s_-]?time": (MetricType.AHT, "s"),
-    r"\bcsat\b|customer[\s_-]?satisfaction": (MetricType.CSAT, "%"),
-    r"\bnps\b|net[\s_-]?promoter": (MetricType.NPS, ""),
+    r"(?<![a-z])fcr(?![a-z])|first[\s_-]?call[\s_-]?resolution": (MetricType.FCR, "%"),
+    r"(?<![a-z])(?:avg)?aht(?![a-z])|average[\s_-]?handle|handle[\s_-]?time": (MetricType.AHT, "s"),
+    r"(?<![a-z])csat(?![a-z])|customer[\s_-]?satisfaction": (MetricType.CSAT, "%"),
+    r"(?<![a-z])nps(?![a-z])|net[\s_-]?promoter": (MetricType.NPS, ""),
     r"agent[\s_-]?(util|occ)|utilization": (MetricType.AGENT_UTILIZATION, "%"),
     r"abandon[\s_-]?rate": (MetricType.ABANDON_RATE, "%"),
     r"service[\s_-]?level": (MetricType.SERVICE_LEVEL, "%"),
@@ -52,14 +54,15 @@ def _extract_from_sheet(df: pd.DataFrame, sheet_name: str) -> list[Metric]:
         mtype, unit = _classify(col_str)
         # Aggregation: prefer mean unless the metric is a count
         value = float(series.mean())
+        is_fraction = bool(series.between(0, 1).all())
 
-        # Heuristic unit detection from values
-        if not unit:
-            if series.between(0, 1).all():
-                unit = "%"
-                value = value * 100
-            elif series.between(0, 100).all():
-                unit = "%"
+        # Infer a unit from the values when the classifier couldn't assign one
+        if not unit and (is_fraction or bool(series.between(0, 100).all())):
+            unit = "%"
+
+        # Normalize percentage metrics stored as 0-1 fractions to a 0-100 scale
+        if unit == "%" and is_fraction:
+            value = value * 100
 
         metrics.append(
             Metric(
@@ -91,7 +94,7 @@ async def extract_metrics(state: CopilotState) -> dict:
         try:
             df = pd.read_excel(excel_path, sheet_name=sheet_name)
             all_metrics.extend(_extract_from_sheet(df, sheet_name))
-        except Exception as exc:  # noqa: BLE001
+        except Exception as exc:
             return {"log": [f"[Extractor] Failed to read '{sheet_name}': {exc}"]}
 
     metrics_set = MetricsSet(metrics=all_metrics, source_file=excel_path)
