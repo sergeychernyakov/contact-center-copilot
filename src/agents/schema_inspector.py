@@ -3,12 +3,11 @@
 from __future__ import annotations
 
 import pandas as pd
-from langchain_anthropic import ChatAnthropic
 from langchain_core.prompts import ChatPromptTemplate
 
-from ..config import get_settings
 from ..graph.models import SchemaInspection
 from ..graph.state import CopilotState
+from ._llm import get_fast_llm, llm_with_structured_output
 
 PROMPT = ChatPromptTemplate.from_template(
     """You are inspecting an Excel file from a call-center diagnostic.
@@ -42,18 +41,10 @@ def _summarise(path: str) -> str:
 
 async def inspect_schema(state: CopilotState) -> dict:
     """LangGraph node: inspect Excel structure."""
-    settings = get_settings()
     summary = _summarise(state["excel_path"])
 
-    llm = ChatAnthropic(
-        model=settings.model_fast,
-        temperature=0,
-        api_key=settings.anthropic_api_key,
-    ).with_structured_output(SchemaInspection)
-
-    inspection: SchemaInspection = await (PROMPT | llm).ainvoke(  # type: ignore[assignment]
-        {"sheets_summary": summary}
-    )
+    llm = llm_with_structured_output(get_fast_llm(temperature=0), SchemaInspection)
+    inspection: SchemaInspection = await (PROMPT | llm).ainvoke({"sheets_summary": summary})
 
     return {
         "schema_inspection": inspection,

@@ -1,4 +1,4 @@
-"""Reporter agent — generates a NarrativeReport using Sonnet.
+"""Reporter agent — generates a NarrativeReport using the heavy LLM.
 
 The LLM cannot invent numbers: only values from `state["metrics"]` are
 allowed. Benchmark chunks are passed as the only external context.
@@ -8,12 +8,11 @@ from __future__ import annotations
 
 import json
 
-from langchain_anthropic import ChatAnthropic
 from langchain_core.prompts import ChatPromptTemplate
 
-from ..config import get_settings
 from ..graph.models import NarrativeReport
 from ..graph.state import CopilotState
+from ._llm import get_heavy_llm, llm_with_structured_output
 
 PROMPT = ChatPromptTemplate.from_template(
     """You are an HR-grade analyst writing a contact-center diagnostic report.
@@ -51,7 +50,6 @@ def _feedback_block(history: list[str]) -> str:
 
 async def generate_report(state: CopilotState) -> dict:
     """LangGraph node: generate (or regenerate) the narrative report."""
-    settings = get_settings()
     metrics = state.get("metrics")
     chunks = state.get("benchmark_chunks", [])
     history = state.get("feedback_history", [])
@@ -68,13 +66,8 @@ async def generate_report(state: CopilotState) -> dict:
         for c in chunks
     )
 
-    llm = ChatAnthropic(
-        model=settings.model_heavy,
-        temperature=0.2,
-        api_key=settings.anthropic_api_key,
-    ).with_structured_output(NarrativeReport)
-
-    report: NarrativeReport = await (PROMPT | llm).ainvoke(  # type: ignore[assignment]
+    llm = llm_with_structured_output(get_heavy_llm(temperature=0.2), NarrativeReport)
+    report: NarrativeReport = await (PROMPT | llm).ainvoke(
         {
             "metrics_json": metrics_json,
             "benchmarks_text": benchmarks_text or "(none retrieved)",
