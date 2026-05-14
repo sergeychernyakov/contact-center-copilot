@@ -6,14 +6,12 @@ Usage: streamlit run src/ui/streamlit_app.py
 from __future__ import annotations
 
 import asyncio
-import json
 import tempfile
-from pathlib import Path
 
 import streamlit as st
 
+from src.graph.state import CopilotState
 from src.graph.workflow import run_pipeline
-
 
 # ─── Page config ────────────────────────────────────────────────────────────
 
@@ -140,10 +138,11 @@ if run and uploaded is not None:
         excel_path = tmp.name
 
     with st.status("Running pipeline...", expanded=True) as status:
+        final_state: CopilotState | None = None
         try:
             final_state = asyncio.run(run_pipeline(excel_path, industry=industry))
             status.update(label="✅ Pipeline complete", state="complete")
-        except Exception as exc:  # noqa: BLE001
+        except Exception as exc:
             status.update(label=f"❌ Pipeline failed: {exc}", state="error")
             st.exception(exc)
             final_state = None

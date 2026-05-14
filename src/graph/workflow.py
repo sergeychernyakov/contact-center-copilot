@@ -88,4 +88,4 @@ async def run_pipeline(excel_path: str, industry: str = "cross_industry") -> Cop
         "benchmark_chunks": [],
         "log": [],
     }
-    return await WORKFLOW.ainvoke(initial)
+    return await WORKFLOW.ainvoke(initial)  # type: ignore[no-any-return]

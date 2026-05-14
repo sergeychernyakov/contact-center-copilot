@@ -74,7 +74,7 @@ async def generate_report(state: CopilotState) -> dict:
         api_key=settings.anthropic_api_key,
     ).with_structured_output(NarrativeReport)
 
-    report: NarrativeReport = await (PROMPT | llm).ainvoke(
+    report: NarrativeReport = await (PROMPT | llm).ainvoke(  # type: ignore[assignment]
         {
             "metrics_json": metrics_json,
             "benchmarks_text": benchmarks_text or "(none retrieved)",

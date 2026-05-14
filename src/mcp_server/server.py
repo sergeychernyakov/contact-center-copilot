@@ -9,17 +9,14 @@ Usage: python -m src.mcp_server.server
 
 from __future__ import annotations
 
-import asyncio
-import json
 from pathlib import Path
 
+import pandas as pd
 from fastmcp import FastMCP
 
 from ..agents.extractor import _extract_from_sheet
 from ..rag.retriever import BenchmarkRetriever
 from ..tools.roi_calculator import aht_reduction_savings, fcr_improvement_savings
-
-import pandas as pd
 
 mcp = FastMCP("Contact Center Copilot")
 
@@ -58,9 +55,7 @@ def extract_metrics(path: str, sheet_name: str) -> list[dict]:
 
 
 @mcp.tool()
-async def search_benchmarks(
-    query: str, industry: str = "cross_industry", k: int = 5
-) -> list[dict]:
+async def search_benchmarks(query: str, industry: str = "cross_industry", k: int = 5) -> list[dict]:
     """Search industry benchmark corpus and return ranked chunks."""
     retriever = _get_retriever()
     chunks = await retriever.retrieve(query, industry=industry, k=k)
@@ -74,9 +69,7 @@ def estimate_fcr_roi(
     daily_call_volume: int,
 ) -> dict:
     """Estimate annual savings from improving First Call Resolution."""
-    scenario = fcr_improvement_savings(
-        current_fcr_pct, target_fcr_pct, daily_call_volume
-    )
+    scenario = fcr_improvement_savings(current_fcr_pct, target_fcr_pct, daily_call_volume)
     return scenario.model_dump()
 
 
@@ -87,9 +80,7 @@ def estimate_aht_roi(
     num_agents: int,
 ) -> dict:
     """Estimate annual savings from reducing Average Handle Time."""
-    scenario = aht_reduction_savings(
-        current_aht_seconds, target_aht_seconds, num_agents
-    )
+    scenario = aht_reduction_savings(current_aht_seconds, target_aht_seconds, num_agents)
     return scenario.model_dump()
 
 

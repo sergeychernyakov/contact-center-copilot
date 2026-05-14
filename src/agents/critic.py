@@ -108,7 +108,7 @@ async def critique_report(state: CopilotState) -> dict:
         api_key=settings.anthropic_api_key,
     ).with_structured_output(CriticReport)
 
-    critic_llm: CriticReport = await (PROMPT | llm).ainvoke(
+    critic_llm: CriticReport = await (PROMPT | llm).ainvoke(  # type: ignore[assignment]
         {
             "report_text": _report_text(report),
             "allowed_facts": allowed_facts,

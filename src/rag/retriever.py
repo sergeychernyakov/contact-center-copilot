@@ -55,9 +55,7 @@ class BenchmarkRetriever:
             d.metadata["is_cross_industry"] = True
         return target + fallback, True
 
-    def _rrf(
-        self, rankings: list[list[Document]]
-    ) -> list[tuple[Document, float]]:
+    def _rrf(self, rankings: list[list[Document]]) -> list[tuple[Document, float]]:
         """Reciprocal Rank Fusion of multiple ranking lists."""
         scores: dict[str, float] = defaultdict(float)
         doc_by_key: dict[str, Document] = {}
@@ -68,8 +66,8 @@ class BenchmarkRetriever:
                 scores[key] += 1.0 / (self.rrf_k + rank + 1)
                 doc_by_key[key] = doc
 
-        ranked = sorted(scores.items(), key=lambda kv: kv[1], reverse=True)
-        return [(doc_by_key[k], s) for k, s in ranked]
+        ranked_items = sorted(scores.items(), key=lambda kv: kv[1], reverse=True)
+        return [(doc_by_key[k], s) for k, s in ranked_items]
 
     async def retrieve(
         self,
@@ -78,19 +76,16 @@ class BenchmarkRetriever:
         k: int = 5,
     ) -> list[BenchmarkChunk]:
         """Hybrid search, RRF, industry filter; returns BenchmarkChunks."""
-        dense_docs = await asyncio.to_thread(
-            self.dense.similarity_search, query, k=10
-        )
+        dense_docs = await asyncio.to_thread(self.dense.similarity_search, query, k=10)
         bm25_docs = await asyncio.to_thread(self.bm25.invoke, query)
 
         fused = self._rrf([dense_docs, bm25_docs])
-        filtered, fell_back = self._filter_by_industry(
-            [d for d, _ in fused], industry
-        )
+        # `_filter_by_industry` flags cross-industry docs via metadata, so the
+        # boolean return is not needed here.
+        filtered, _fell_back = self._filter_by_industry([d for d, _ in fused], industry)
         # Re-attach RRF scores
         score_lookup = {
-            f"{d.metadata.get('source', '')}::{d.page_content[:60]}": s
-            for d, s in fused
+            f"{d.metadata.get('source', '')}::{d.page_content[:60]}": s for d, s in fused
         }
 
         chunks: list[BenchmarkChunk] = []

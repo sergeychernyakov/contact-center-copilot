@@ -51,7 +51,7 @@ async def inspect_schema(state: CopilotState) -> dict:
         api_key=settings.anthropic_api_key,
     ).with_structured_output(SchemaInspection)
 
-    inspection: SchemaInspection = await (PROMPT | llm).ainvoke(
+    inspection: SchemaInspection = await (PROMPT | llm).ainvoke(  # type: ignore[assignment]
         {"sheets_summary": summary}
     )
 
