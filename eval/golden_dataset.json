@@ -1,0 +1,46 @@
+{
+  "version": "0.1.0",
+  "description": "Golden dataset for regression testing. Each case has an input Excel + expected facts/constraints.",
+  "cases": [
+    {
+      "id": "case_001",
+      "excel_path": "data/sample_diagnostic.xlsx",
+      "industry": "banking",
+      "expected": {
+        "key_metrics": {
+          "FCR": 68.0,
+          "AHT_seconds": 420,
+          "CSAT": 81.0
+        },
+        "must_mention": ["FCR", "AHT", "CSAT"],
+        "must_not_invent_numbers": true,
+        "must_flag_cross_industry_if_used": true,
+        "max_cost_usd": 0.10,
+        "max_latency_seconds": 30
+      }
+    },
+    {
+      "id": "case_002",
+      "excel_path": "data/sample_diagnostic.xlsx",
+      "industry": "retail",
+      "expected": {
+        "key_metrics": {
+          "FCR": 68.0,
+          "AbandonRate": 7.0
+        },
+        "must_mention": ["FCR"],
+        "must_not_invent_numbers": true,
+        "max_cost_usd": 0.10,
+        "max_latency_seconds": 30
+      }
+    }
+  ],
+  "thresholds": {
+    "faithfulness": 0.85,
+    "numeric_accuracy": 1.0,
+    "citation_coverage": 0.80,
+    "narrative_quality_min": 4.0,
+    "cost_per_report_max_usd": 0.10,
+    "p95_latency_seconds": 30
+  }
+}

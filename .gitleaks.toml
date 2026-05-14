@@ -1,0 +1,14 @@
+# .gitleaks.toml — secret-scanning config (extends the gitleaks defaults).
+[extend]
+useDefault = true
+
+[allowlist]
+description = "Placeholders and vendored reference code — not real secrets."
+paths = [
+  '''\.env\.example$''',
+  '''reference/.*''',
+]
+regexes = [
+  '''sk-ant-xxx-replace-me''',
+  '''dummy-key-for-unit-tests''',
+]

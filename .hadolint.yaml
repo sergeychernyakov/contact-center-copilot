@@ -1,0 +1,5 @@
+# .hadolint.yaml — Dockerfile linter configuration.
+failure-threshold: warning
+ignored:
+  - DL3008  # apt: pin package versions — relaxed for this POC
+  - DL3013  # pip: pin package versions — relaxed for this POC
