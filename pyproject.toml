@@ -17,6 +17,7 @@ dependencies = [
     # RAG
     "faiss-cpu>=1.8.0",
     "sentence-transformers>=3.0.0",
+    "langchain-huggingface>=1.2.0",
     "rank-bm25>=0.2.2",
     # MCP
     "fastmcp>=0.2.0",
@@ -95,7 +96,6 @@ select = [
     "PT",       # flake8-pytest-style
     "PTH",      # flake8-use-pathlib
     "ICN",      # flake8-import-conventions
-    "TID",      # flake8-tidy-imports
     "ISC",      # flake8-implicit-str-concat
     "RUF",      # ruff-specific rules
 ]
@@ -103,7 +103,10 @@ ignore = [
     "E501",     # line too long — handled by `ruff format`
     "B008",     # function call in argument defaults
     "ISC001",   # conflicts with the formatter
+    "UP042",    # Enum -> StrEnum: runtime semantics differ, migrate deliberately
 ]
+# Relative imports are this project's deliberate style — flake8-tidy-imports
+# (TID) is intentionally not selected.
 
 [tool.ruff.lint.per-file-ignores]
 "tests/**/*" = ["F401", "F841", "E402", "PT011", "ARG"]
@@ -145,6 +148,7 @@ exclude_lines = [
 [tool.mypy]
 python_version = "3.11"
 strict = false
+plugins = ["pydantic.mypy"]
 ignore_missing_imports = true
 check_untyped_defs = true
 warn_redundant_casts = true
