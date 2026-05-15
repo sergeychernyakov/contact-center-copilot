@@ -15,6 +15,9 @@ in plain LangChain because chains are DAGs.
 
 from __future__ import annotations
 
+from collections.abc import AsyncIterator
+from typing import Any
+
 from langgraph.graph import END, StateGraph
 
 from ..agents.benchmark_retriever import retrieve_benchmarks
@@ -78,9 +81,8 @@ def build_graph():
 WORKFLOW = build_graph()
 
 
-async def run_pipeline(excel_path: str, industry: str = "cross_industry") -> CopilotState:
-    """Convenience entry point — run the full pipeline end-to-end."""
-    initial: CopilotState = {
+def _initial_state(excel_path: str, industry: str) -> CopilotState:
+    return {
         "excel_path": excel_path,
         "industry": industry,
         "attempts": 0,
@@ -88,4 +90,32 @@ async def run_pipeline(excel_path: str, industry: str = "cross_industry") -> Cop
         "benchmark_chunks": [],
         "log": [],
     }
-    return await WORKFLOW.ainvoke(initial)  # type: ignore[no-any-return]
+
+
+async def run_pipeline(excel_path: str, industry: str = "cross_industry") -> CopilotState:
+    """Convenience entry point — run the full pipeline end-to-end."""
+    return await WORKFLOW.ainvoke(_initial_state(excel_path, industry))  # type: ignore[no-any-return]
+
+
+async def run_pipeline_streaming(
+    excel_path: str, industry: str = "cross_industry"
+) -> AsyncIterator[tuple[str, dict[str, Any]]]:
+    """Stream pipeline progress one node at a time.
+
+    Yields ``(node_name, state)`` after each node completes — ``state`` is the
+    accumulated state with every update merged in, so the last yield carries
+    the final pipeline result. The Streamlit UI uses this to light up agents
+    as they finish and to show Critic iterations live.
+    """
+    initial = _initial_state(excel_path, industry)
+    state: dict[str, Any] = dict(initial)
+    async for chunk in WORKFLOW.astream(initial, stream_mode="updates"):
+        for node, update in chunk.items():
+            if not update:
+                continue
+            for key, value in update.items():
+                if key == "log":
+                    state[key] = list(state.get(key, [])) + list(value or [])
+                else:
+                    state[key] = value
+            yield node, state
