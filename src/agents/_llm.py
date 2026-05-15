@@ -81,10 +81,47 @@ def get_heavy_llm(temperature: float = 0.0) -> BaseChatModel:
     return _build(settings.model_heavy, temperature)
 
 
+def _retry_exception_types() -> tuple[type[BaseException], ...]:
+    """Exception classes that should trigger a Runnable retry.
+
+    Two Groq-specific cases:
+
+    1. ``AuthenticationError`` — Groq's edge fleet sometimes returns
+       ``401 Invalid API Key`` for a valid key when the request lands on a
+       node that has not yet picked up the key from the auth backend; the
+       next request to a different node succeeds.
+    2. ``RateLimitError`` — the free tier's TPM ceiling is easy to hit when
+       the Reporter fires three structured-output calls in parallel; backoff
+       gets us through.
+
+    Without ``groq`` installed there is nothing provider-specific to catch.
+    """
+    try:
+        from groq import AuthenticationError as GroqAuthError
+        from groq import RateLimitError as GroqRateLimitError
+    except ImportError:
+        return ()
+    return (GroqAuthError, GroqRateLimitError)
+
+
+_RETRY_EXC = _retry_exception_types()
+
+
 def llm_with_structured_output(model: BaseChatModel, schema: Any) -> Any:
     """Apply structured output binding, handling provider differences.
 
     Groq supports JSON mode + function calling. Anthropic has native
     Pydantic binding. Both go through LangChain's unified interface.
+
+    The returned Runnable retries flaky Groq auth errors (see
+    ``_retry_exception_types``); on Ollama/Anthropic the retry is a no-op
+    because those exception types are never raised.
     """
-    return model.with_structured_output(schema)
+    runnable = model.with_structured_output(schema)
+    if not _RETRY_EXC:
+        return runnable
+    return runnable.with_retry(
+        retry_if_exception_type=_RETRY_EXC,
+        wait_exponential_jitter=True,
+        stop_after_attempt=10,
+    )
