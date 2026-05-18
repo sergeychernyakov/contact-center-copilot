@@ -48,6 +48,39 @@ st.caption(
     "scenarios and citations."
 )
 
+# Inject the spinner CSS once. The .ccpilot-spinner span replaces the static
+# ⏳ emoji on the row of whichever agent is currently running so the user
+# always sees actual motion, not a frozen icon.
+st.markdown(
+    """<style>
+@keyframes ccpilot-spin { to { transform: rotate(360deg); } }
+.ccpilot-spinner {
+  display: inline-block;
+  width: 14px; height: 14px;
+  border: 2px solid #60A5FA;
+  border-top-color: transparent;
+  border-radius: 50%;
+  animation: ccpilot-spin 0.8s linear infinite;
+  vertical-align: -2px;
+  margin-right: 6px;
+}
+.ccpilot-pulse {
+  display: inline-block;
+  width: 10px; height: 10px;
+  border-radius: 50%;
+  background: #10B981;
+  margin-right: 6px;
+  animation: ccpilot-pulse 1.4s ease-in-out infinite;
+  vertical-align: 1px;
+}
+@keyframes ccpilot-pulse {
+  0%,100% { box-shadow: 0 0 0 0 rgba(16,185,129,.7); }
+  50% { box-shadow: 0 0 0 6px rgba(16,185,129,0); }
+}
+</style>""",
+    unsafe_allow_html=True,
+)
+
 
 # ─── Sidebar ────────────────────────────────────────────────────────────────
 
@@ -89,6 +122,50 @@ NODE_ORDER: list[tuple[str, str, str]] = [
     ("guardrails", "🛡️ Guardrails", "PII redaction + tone"),
 ]
 NODE_LABEL = {n: (label, hint) for n, label, hint in NODE_ORDER}
+
+# Rich descriptions shown under the row of whichever agent is currently
+# running, so the viewer understands what each step is doing and why.
+NODE_DESCRIPTIONS: dict[str, str] = {
+    "schema_inspector": (
+        "Reads the workbook **structure only** — sheet names and headers, "
+        "not values — with the fast LLM. Decides which sheets carry "
+        "call-center KPIs (FCR, AHT, CSAT, abandon rate…) and which to "
+        "ignore (HR costs, payroll, real estate). Cheap and parallel-safe."
+    ),
+    "extractor": (
+        "Pure pandas, **no LLM**. Pulls every numeric KPI out of the sheets "
+        "the inspector flagged as relevant. The number that lands in the "
+        "state is the number that was in the cell — there is no room for "
+        "the LLM to invent figures (see Challenge 1 in the README)."
+    ),
+    "retriever": (
+        "Hybrid search across `data/benchmarks/*.md`: **BM25** for acronym "
+        "matching (FCR, AHT, NPS) + **dense FAISS** embeddings for "
+        "semantics, fused via RRF. Pre-filters by the selected industry; "
+        "falls back to cross-industry only when no industry-specific chunk "
+        "is found (and flags it in the output)."
+    ),
+    "reporter": (
+        "Heavy LLM generates four focused structured-output sections **in "
+        "parallel** via `asyncio.gather`: executive prose, benchmark "
+        "comparisons with computed gap %, ROI projections, then citations "
+        "attributing claims back to the retrieved sources. Splitting the "
+        "schema into small pieces makes smaller models fill it reliably."
+    ),
+    "critic": (
+        "Strict reviewer. Scores the report on **faithfulness** (claims "
+        "grounded in retrieved facts) and **numeric accuracy** (regex-checks "
+        "that every number is traceable). Below threshold → kicks Reporter "
+        "back for a rewrite, up to `max_reporter_attempts` (default 3). "
+        "This is the cycle that LangGraph buys us — chains can't loop."
+    ),
+    "guardrails": (
+        "Regex sweep for **PII** (phones, SSNs, emails, credit cards) — "
+        "anything sensitive gets redacted in-place. Plus a tone check. If "
+        "the Critic loop maxed out without passing the threshold, the "
+        "report is flagged for human review (HITL escalation)."
+    ),
+}
 
 # Metrics where a lower value is better (so a positive gap is bad).
 LOWER_IS_BETTER = ("aht", "abandon", "handle", "occupancy", "wait")
@@ -286,9 +363,19 @@ def _row_markdown(
         )
     if status == "running":
         att = f" &nbsp;·&nbsp; attempt {run_count + 1}" if run_count else ""
+        desc = NODE_DESCRIPTIONS.get(node, "")
+        desc_block = (
+            f"\n\n<div style='margin-left:22px;padding:8px 12px;border-left:2px solid #3B82F6;"
+            f"background:rgba(59,130,246,.07);border-radius:0 6px 6px 0;opacity:.88;"
+            f"font-size:.92em;line-height:1.55'>{desc}</div>"
+            if desc
+            else ""
+        )
         return (
-            f"⏳&nbsp;&nbsp;<span style='font-size:1.05em'>**{label}**</span>{att} "
-            f"&nbsp;·&nbsp; <span style='opacity:.75'>{hint}…</span>"
+            f"<span class='ccpilot-spinner'></span>"
+            f"<span style='font-size:1.05em'><strong>{label}</strong></span>{att} "
+            f"&nbsp;·&nbsp; <span style='opacity:.85'>{hint}…</span>"
+            f"{desc_block}"
         )
     # done
     suffix = f" &nbsp;·&nbsp; ran {run_count} times" if run_count > 1 else ""
@@ -489,6 +576,7 @@ async def _run_with_live_progress(
     arch_holder: Any,
     placeholders: dict,
     critic_holder: Any,
+    status_obj: Any | None = None,
 ) -> tuple[dict, float]:
     """Consume run_pipeline_streaming and update the UI as each node finishes."""
     max_attempts = get_settings().max_reporter_attempts
@@ -505,6 +593,9 @@ async def _run_with_live_progress(
         _row_markdown(first, "running", 0, 0, None), unsafe_allow_html=True
     )
     arch_holder.graphviz_chart(_arch_dot(active=first, completed=completed))
+    if status_obj is not None:
+        first_label, first_hint = NODE_LABEL[first]
+        status_obj.update(label=f"🔄 {first_label} — {first_hint}…", state="running")
 
     pipeline_start = time.time()
     final_state: dict = {}
@@ -542,6 +633,9 @@ async def _run_with_live_progress(
                 unsafe_allow_html=True,
             )
             arch_holder.graphviz_chart(_arch_dot(active=nxt, completed=completed))
+            if status_obj is not None:
+                nxt_label, nxt_hint = NODE_LABEL[nxt]
+                status_obj.update(label=f"🔄 {nxt_label} — {nxt_hint}…", state="running")
         else:
             arch_holder.graphviz_chart(_arch_dot(active="", completed=completed))
         final_state = state
@@ -567,13 +661,20 @@ if run_button and uploaded is not None:
         tmp.write(uploaded.getvalue())
         excel_path = tmp.name
 
-    st.markdown("### 🗺️ Workflow")
-    arch_holder = st.empty()
-    arch_holder.graphviz_chart(_arch_dot())
+    final_state: dict = {}
+    duration: float = 0.0
+    # st.status gives a Streamlit-native spinner at the top of the block that
+    # keeps moving for the entire pipeline; the CSS spinner above moves
+    # per-agent inside.
+    pipeline_status = st.status(
+        "🚀 Running pipeline — six agents kicking off…", expanded=True, state="running"
+    )
+    with pipeline_status:
+        st.markdown("**🗺️ Workflow**")
+        arch_holder = st.empty()
+        arch_holder.graphviz_chart(_arch_dot())
 
-    progress_box = st.container(border=True)
-    with progress_box:
-        st.markdown("**🚀 Pipeline progress**")
+        st.markdown("**Pipeline progress**")
         node_placeholders = {n: st.empty() for n, _, _ in NODE_ORDER}
         for node_id, _lbl, _hnt in NODE_ORDER:
             node_placeholders[node_id].markdown(
@@ -581,19 +682,24 @@ if run_button and uploaded is not None:
             )
         critic_holder = st.empty()
 
-    final_state: dict = {}
-    duration: float = 0.0
-    try:
-        final_state, duration = asyncio.run(
-            _run_with_live_progress(
-                excel_path, industry, arch_holder, node_placeholders, critic_holder
+        try:
+            final_state, duration = asyncio.run(
+                _run_with_live_progress(
+                    excel_path,
+                    industry,
+                    arch_holder,
+                    node_placeholders,
+                    critic_holder,
+                    pipeline_status,
+                )
             )
-        )
-        st.toast(f"✅ Pipeline complete in {duration:.1f}s", icon="🎉")
-    except Exception as exc:
-        st.error(f"❌ Pipeline failed: {exc}")
-        st.exception(exc)
-        final_state = {}
+            pipeline_status.update(
+                label=f"✅ Pipeline complete in {duration:.1f}s", state="complete"
+            )
+        except Exception as exc:
+            pipeline_status.update(label=f"❌ Pipeline failed: {exc}", state="error")
+            st.exception(exc)
+            final_state = {}
 
     if final_state:
         st.divider()
