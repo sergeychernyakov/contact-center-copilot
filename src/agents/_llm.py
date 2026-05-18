@@ -97,6 +97,7 @@ def _retry_exception_types() -> tuple[type[BaseException], ...]:
     Without ``groq`` installed there is nothing provider-specific to catch.
     """
     try:
+        # pylint: disable=import-outside-toplevel
         from groq import AuthenticationError as GroqAuthError
         from groq import RateLimitError as GroqRateLimitError
     except ImportError:
