@@ -615,7 +615,7 @@ async def _run_with_live_progress(
     arch_holder.graphviz_chart(_arch_dot(active=first, completed=completed))
     if status_obj is not None:
         first_label, first_hint = NODE_LABEL[first]
-        status_obj.update(label=f"🔄 {first_label} — {first_hint}…", state="running")
+        status_obj.update(label=f"🔄 {first_label} — {first_hint}…", state="running", expanded=True)
 
     pipeline_start = time.time()
     final_state: dict = {}
@@ -655,7 +655,9 @@ async def _run_with_live_progress(
             arch_holder.graphviz_chart(_arch_dot(active=nxt, completed=completed))
             if status_obj is not None:
                 nxt_label, nxt_hint = NODE_LABEL[nxt]
-                status_obj.update(label=f"🔄 {nxt_label} — {nxt_hint}…", state="running")
+                status_obj.update(
+                    label=f"🔄 {nxt_label} — {nxt_hint}…", state="running", expanded=True
+                )
         else:
             arch_holder.graphviz_chart(_arch_dot(active="", completed=completed))
         final_state = state
