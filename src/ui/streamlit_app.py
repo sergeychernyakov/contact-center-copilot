@@ -23,6 +23,7 @@ import asyncio
 import io
 import tempfile
 import time
+from pathlib import Path
 from typing import Any, Literal
 
 import pandas as pd
@@ -238,10 +239,10 @@ def _arch_dot(active: str = "", completed: set[str] | None = None) -> str:
 # ─── File preview (shown right after upload, before Run) ────────────────────
 
 
-def _render_file_preview(uploaded: Any) -> None:
-    """Render a sheets-summary card for the uploaded Excel."""
+def _render_file_preview(name: str, data: bytes, *, is_sample: bool = False) -> None:
+    """Render a sheets-summary card for the active Excel source."""
     try:
-        xls = pd.ExcelFile(io.BytesIO(uploaded.getvalue()))
+        xls = pd.ExcelFile(io.BytesIO(data))
     except Exception as exc:
         st.error(f"Couldn't read the Excel file: {exc}")
         return
@@ -259,10 +260,16 @@ def _render_file_preview(uploaded: Any) -> None:
             }
         )
     with st.container(border=True):
+        tag = (
+            " &nbsp;·&nbsp; <span style='color:#10B981'>sample (auto-loaded)</span>"
+            if is_sample
+            else ""
+        )
         st.markdown(
-            f"**📂 `{uploaded.name}`** &nbsp;·&nbsp; "
+            f"**📂 `{name}`** &nbsp;·&nbsp; "
             f"{len(xls.sheet_names)} sheets &nbsp;·&nbsp; "
-            f"{len(uploaded.getvalue()) / 1024:.1f} KB"
+            f"{len(data) / 1024:.1f} KB{tag}",
+            unsafe_allow_html=True,
         )
         st.dataframe(pd.DataFrame(rows), hide_index=True, use_container_width=True)
 
@@ -380,14 +387,27 @@ def _row_markdown(
     # done
     suffix = f" &nbsp;·&nbsp; ran {run_count} times" if run_count > 1 else ""
     head = (
-        f"✅&nbsp;&nbsp;<span style='font-size:1.05em'>**{label}**</span> "
+        f"✅&nbsp;&nbsp;<span style='font-size:1.05em'><strong>{label}</strong></span> "
         f"&nbsp;·&nbsp; `{elapsed:.1f}s`{suffix}"
     )
-    if state is not None:
-        detail = _DETAIL_FUNCS[node](state)
-        if detail:
-            return head + "\n\n" + detail
-    return head
+    detail = _DETAIL_FUNCS[node](state) if state is not None else ""
+    desc = NODE_DESCRIPTIONS.get(node, "")
+    # Keep the explainer visible even after the agent completes — that was
+    # the 'details closing' complaint. Now it shifts from a blue 'active'
+    # callout to a green 'done' callout but stays on screen.
+    desc_block = (
+        f"\n\n<div style='margin-left:22px;padding:8px 12px;border-left:2px solid #10B981;"
+        f"background:rgba(16,185,129,.05);border-radius:0 6px 6px 0;opacity:.85;"
+        f"font-size:.92em;line-height:1.55'>{desc}</div>"
+        if desc
+        else ""
+    )
+    parts = [head]
+    if detail:
+        parts.append(detail)
+    if desc_block:
+        parts.append(desc_block)
+    return "\n\n".join(parts)
 
 
 def _render_critic_cards(holder: Any, attempts: list[dict]) -> None:
@@ -646,19 +666,34 @@ async def _run_with_live_progress(
 # ─── Main flow ──────────────────────────────────────────────────────────────
 
 uploaded = st.file_uploader(
-    "Upload contact-center diagnostic Excel",
+    "Upload contact-center diagnostic Excel (or click Run to use the sample)",
     type=["xlsx", "xls"],
     help="Sheets with FCR, AHT, CSAT, agent utilization, etc.",
 )
 
+# Auto-load the sample file when nothing is uploaded so the demo is one click.
+SAMPLE_PATH = Path("data/sample_diagnostic.xlsx")
 if uploaded is not None:
-    _render_file_preview(uploaded)
+    source_bytes: bytes | None = uploaded.getvalue()
+    source_name: str | None = uploaded.name
+    is_sample = False
+elif SAMPLE_PATH.exists():
+    source_bytes = SAMPLE_PATH.read_bytes()
+    source_name = SAMPLE_PATH.name
+    is_sample = True
+else:
+    source_bytes = None
+    source_name = None
+    is_sample = False
 
-run_button = st.button("▶️ Run Analysis", type="primary", disabled=uploaded is None)
+if source_bytes is not None and source_name is not None:
+    _render_file_preview(source_name, source_bytes, is_sample=is_sample)
 
-if run_button and uploaded is not None:
+run_button = st.button("▶️ Run Analysis", type="primary", disabled=source_bytes is None)
+
+if run_button and source_bytes is not None:
     with tempfile.NamedTemporaryFile(suffix=".xlsx", delete=False) as tmp:
-        tmp.write(uploaded.getvalue())
+        tmp.write(source_bytes)
         excel_path = tmp.name
 
     final_state: dict = {}
@@ -693,16 +728,22 @@ if run_button and uploaded is not None:
                     pipeline_status,
                 )
             )
+            # expanded=True is required — st.status auto-collapses on
+            # state="complete" by default, which would hide the graphviz
+            # diagram, every agent row and the Critic cards the moment the
+            # pipeline finishes. We want them to stay on screen.
             pipeline_status.update(
-                label=f"✅ Pipeline complete in {duration:.1f}s", state="complete"
+                label=f"✅ Pipeline complete in {duration:.1f}s",
+                state="complete",
+                expanded=True,
             )
         except Exception as exc:
-            pipeline_status.update(label=f"❌ Pipeline failed: {exc}", state="error")
+            pipeline_status.update(label=f"❌ Pipeline failed: {exc}", state="error", expanded=True)
             st.exception(exc)
             final_state = {}
 
     if final_state:
         st.divider()
         _render_report(final_state, duration)
-elif not uploaded:
+elif source_bytes is None:
     st.info("👆 Upload an Excel file to begin. A sample is at `data/sample_diagnostic.xlsx`.")
