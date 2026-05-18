@@ -26,6 +26,18 @@ flowchart TD
     MCP -.exposes.-> BR
 ```
 
+## Pipeline entry points
+
+`src/graph/workflow.py` exposes two functions over the same compiled graph:
+
+- `run_pipeline(excel_path, industry) -> CopilotState` — `WORKFLOW.ainvoke(...)`,
+  returns the final state when everything is done. Used by `eval/run_eval.py`.
+- `run_pipeline_streaming(excel_path, industry)` — async generator over
+  `WORKFLOW.astream(stream_mode="updates")`. Yields `(node_name, state)` after
+  each node completes, where `state` is the accumulated state with all node
+  updates merged in. The Streamlit UI uses this to light up agents as they
+  finish and to push Critic-iteration cards on every loop pass.
+
 ## State
 
 LangGraph state is a `TypedDict` (`src/graph/state.py`) populated incrementally:

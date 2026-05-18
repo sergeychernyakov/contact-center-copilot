@@ -113,16 +113,52 @@ Open http://localhost:8501, upload `data/sample_diagnostic.xlsx`, click **Run An
 
 ## Demo
 
-📺 **3-minute walkthrough:** [demo.mp4](./demo.mp4)
+Two Streamlit apps ship with the repo. Both auto-launch through `streamlit run`
+and use the active `LLM_PROVIDER` from `.env`.
 
-![Demo GIF](./docs/demo.gif)
+### Main UI — `src/ui/streamlit_app.py`
 
-The video shows:
-- Excel upload and schema inspection (12 KPIs identified across 3 relevant sheets)
-- Multi-agent pipeline streaming output to UI
-- Final narrative report with inline citations
-- LangSmith trace showing per-agent latency
-- GitHub Actions CI run with regression gates
+What you see, in order:
+
+1. **Sample auto-load.** `data/sample_diagnostic.xlsx` is preloaded the moment
+   the page opens — no upload step, the **Run Analysis** button is live on
+   first paint. Drop your own Excel above to override.
+2. **Sheets preview card.** Before the run, the workbook is rendered as a small
+   table — sheet names, row × column counts, first column names — so the page
+   is never empty while you read.
+3. **Workflow diagram.** A Graphviz chart at the top of the run, six nodes
+   plus the report sink, edges including the dashed Critic → Reporter retry
+   loop. The active node turns blue, completed ones turn green, **redrawn on
+   every per-node event** as the LangGraph stream emits updates.
+4. **Live per-agent rows.** Six rows transition `⚪ pending → ⏳ running →
+   ✅ done`. The running row has an actual CSS-spinning ring (not a static
+   emoji), plus a callout under it explaining what the step is doing and why
+   (≈ 3–5 sentences). On completion the row keeps the explainer and adds a
+   result detail line — sheet chips, KPI value chips, retrieved benchmark
+   sources, section counts, faithfulness scores.
+5. **Critic iteration cards** stack live as the self-correction loop runs —
+   `Attempt 1: faithfulness 0.82 retry → Attempt 2: 0.91 PASS`. The loop is
+   visible, not buried in logs.
+6. **Final report.** Four big **KPI tiles with `st.metric` delta arrows** vs
+   the benchmark (colour flipped for lower-is-better metrics like AHT). A
+   **Plotly grouped bar chart** for the full benchmark comparison. Executive
+   Summary revealed word-by-word via a typewriter effect so the narrative
+   *lands* instead of dumping as a wall. ROI scenarios, recommendations and
+   citations follow as sections.
+
+The whole run is wrapped in an `st.status(expanded=True)` so a native
+Streamlit spinner ticks at the top of the block for the entire pipeline; on
+local Ollama a single run is ~12 min, on Groq with the right model it drops
+to seconds.
+
+### Eval dashboard — `eval/dashboard.py`
+
+`streamlit run eval/dashboard.py` opens a regression dashboard backed by
+`eval/last_run.json` and the thresholds in `eval/golden_dataset.json`. It
+reports per-case **numeric accuracy** and **must-mention coverage** as the
+gated metrics (latency is recorded but not gated — it's provider-dependent),
+shows pass / fail per case, and points at the same `run_eval.py` you'd hook
+into CI.
 
 ---
 
@@ -183,7 +219,8 @@ contact-center-copilot/
 │   ├── ui/                  # Streamlit app
 │   └── config/              # Pydantic Settings
 ├── tests/                   # pytest
-├── eval/                    # golden_dataset + run_eval.py
+├── eval/                    # golden_dataset.json, run_eval.py (CI gates),
+│                            #   dashboard.py (Streamlit eval view), last_run.json
 ├── data/
 │   ├── sample_diagnostic.xlsx
 │   └── benchmarks/          # Industry benchmark markdown chunks
