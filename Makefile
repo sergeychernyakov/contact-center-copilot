@@ -8,6 +8,11 @@ SHELL := /bin/bash
 PY    := python3
 SRC   := src
 TESTS := tests
+# Auto-detect the project's virtualenv so the same Make targets work from
+# (a) an activated shell, (b) git-pre-push hooks where PATH does NOT include
+# .venv, and (c) plain user invocation. Falls back to bare tool names on
+# PATH when no .venv directory is present.
+VENV_BIN := $(shell test -x .venv/bin/python && echo .venv/bin/ || echo "")
 # Unit tests never call the LLM; a dummy key just satisfies config loading.
 TEST_ENV := ANTHROPIC_API_KEY=$${ANTHROPIC_API_KEY:-dummy-key-for-unit-tests}
 
@@ -24,38 +29,38 @@ install:  ## Install dev dependencies and git hooks
 	@echo "Hooks installed: pre-commit, commit-msg, pre-push."
 
 format:  ## Auto-format and auto-fix the code (ruff)
-	ruff check --fix --exit-zero $(SRC) $(TESTS)
-	ruff format $(SRC) $(TESTS)
+	$(VENV_BIN)ruff check --fix --exit-zero $(SRC) $(TESTS)
+	$(VENV_BIN)ruff format $(SRC) $(TESTS)
 
 lint:  ## Lint without modifying files (ruff)
-	ruff check $(SRC) $(TESTS)
-	ruff format --check $(SRC) $(TESTS)
+	$(VENV_BIN)ruff check $(SRC) $(TESTS)
+	$(VENV_BIN)ruff format --check $(SRC) $(TESTS)
 
 pylint:  ## Deep static analysis (pylint, fail-under 9.5)
-	pylint --rcfile=.pylintrc $(SRC)
+	$(VENV_BIN)pylint --rcfile=.pylintrc $(SRC)
 
 type:  ## Static type checking (mypy)
-	mypy $(SRC)
+	$(VENV_BIN)mypy $(SRC)
 
 security:  ## Security scan (bandit)
-	bandit -c pyproject.toml -r $(SRC)
+	$(VENV_BIN)bandit -c pyproject.toml -r $(SRC)
 
 # `audit` ignores PYSEC-2022-42969: ReDoS in the unmaintained transitive `py`
 # package (SVN-only code path, unreachable here; no fixed release exists).
 audit:  ## Dependency vulnerability audit (pip-audit)
-	pip-audit --skip-editable --ignore-vuln PYSEC-2022-42969
+	$(VENV_BIN)pip-audit --skip-editable --ignore-vuln PYSEC-2022-42969
 
 docs:  ## Docstring coverage (interrogate)
-	interrogate -c pyproject.toml $(SRC)
+	$(VENV_BIN)interrogate -c pyproject.toml $(SRC)
 
 deadcode:  ## Dead-code detection (vulture)
-	vulture
+	$(VENV_BIN)vulture
 
 test:  ## Fast unit tests — no coverage gate, no LLM calls
-	$(TEST_ENV) pytest -q $(TESTS) --ignore=$(TESTS)/integration
+	$(TEST_ENV) $(VENV_BIN)pytest -q $(TESTS) --ignore=$(TESTS)/integration
 
 coverage:  ## Unit tests with the 90% coverage gate
-	$(TEST_ENV) pytest --cov=$(SRC) --cov-report=term-missing --cov-report=html \
+	$(TEST_ENV) $(VENV_BIN)pytest --cov=$(SRC) --cov-report=term-missing --cov-report=html \
 		--cov-fail-under=90 $(TESTS) --ignore=$(TESTS)/integration
 
 precommit:  ## Run every git hook against all files
