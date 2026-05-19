@@ -44,10 +44,52 @@ st.set_page_config(
 
 st.title("📞 Contact Center Copilot")
 st.caption(
-    "Multi-agent diagnostic system — upload an Excel, watch six agents run "
-    "live, and get a narrative report with benchmark comparisons, ROI "
-    "scenarios and citations."
+    "Drop in an Excel of call-center stats — get back a one-minute report on "
+    "which numbers are below industry, what to fix first, and how much money "
+    "each fix would save."
 )
+
+with st.expander("💡 What is this? Why isn't it just ChatGPT?", expanded=True):
+    st.markdown(
+        """
+**What it does.** A call center has stats — what percent of issues get
+resolved on the first call, how long calls take on average, how satisfied
+customers are afterward, how many people give up before someone picks up.
+When a bank/retailer hires consultants (like PwC) to figure out why their
+call center isn't great, the consultant spends **2-3 weeks** comparing those
+stats against industry averages, calculating how much each problem is
+costing, and writing a 20-page report.
+
+**This tool does that in 30 seconds.** Drop in the Excel, click Run, get
+back a report with the same shape: which numbers are bad, by how much vs
+the industry, dollar estimates of savings from fixing each one, concrete
+recommendations, and citations to the source documents.
+
+**Why isn't it just ChatGPT?**
+
+ChatGPT happily invents numbers. Ask it _“what's the FCR for this bank?”_
+and it might confidently say **73%** when your Excel says **68%**. In a
+client-facing report that's a fireable mistake.
+
+Here it's done differently:
+
+1. **The numbers in the report come straight from your Excel.** A plain
+   Python program extracts them — no AI in that step — so they physically
+   can't be altered by the model. The AI only writes prose _around_ fixed
+   number slots.
+2. **Industry benchmarks come from pre-loaded reference documents** shipped
+   with the project (with citations you can show the client), not from the
+   model's memory.
+3. **A second AI re-reads the report** and checks every claim against the
+   source data. If anything looks unsupported, the writer gets it back for
+   a rewrite — up to three tries. After three, the report is flagged
+   _“needs human review”_ rather than shipped quietly.
+
+So: **program counts → fetches verified benchmarks → AI writes the prose →
+AI re-reads itself → human reviews if uncertain.** Same job as a junior
+analyst, with auditability and no made-up numbers.
+"""
+    )
 
 # Inject the spinner CSS once. The .ccpilot-spinner span replaces the static
 # ⏳ emoji on the row of whichever agent is currently running so the user
@@ -97,13 +139,13 @@ with st.sidebar:
     st.caption(f"**Provider:** `{settings.llm_provider}`  ·  model: `{settings.model_heavy}`")
     st.divider()
     st.markdown(
-        "**Pipeline:**\n"
-        "1. Schema Inspector (fast LLM)\n"
-        "2. Pandas Extractor (deterministic)\n"
-        "3. Benchmark Retriever (FAISS + BM25)\n"
-        "4. Reporter (heavy LLM)\n"
-        "5. Critic → loop if needed\n"
-        "6. Guardrails (PII / tone)"
+        "**What happens after you click Run:**\n"
+        "1. Picks the right sheets in your Excel\n"
+        "2. Extracts the numbers (no AI — guaranteed accurate)\n"
+        "3. Looks up industry benchmarks\n"
+        "4. Writes the narrative report\n"
+        "5. Re-reads itself, retries if anything looks made up\n"
+        "6. Strips any leaked personal info"
     )
     st.divider()
     st.markdown(
@@ -115,56 +157,57 @@ with st.sidebar:
 # ─── Node metadata ──────────────────────────────────────────────────────────
 
 NODE_ORDER: list[tuple[str, str, str]] = [
-    ("schema_inspector", "🔍 Schema Inspector", "scanning sheets for KPI columns"),
-    ("extractor", "📊 Pandas Extractor", "reading values deterministically"),
-    ("retriever", "📚 Benchmark Retriever", "hybrid search over benchmarks"),
-    ("reporter", "✍️ Reporter", "drafting narrative + ROI"),
-    ("critic", "🔬 Critic", "checking faithfulness"),
-    ("guardrails", "🛡️ Guardrails", "PII redaction + tone"),
+    ("schema_inspector", "🔍 Pick the right sheets", "skipping HR / payroll / supplies"),
+    ("extractor", "📊 Extract the numbers", "no AI here — guaranteed accurate"),
+    ("retriever", "📚 Find industry benchmarks", "looking up reference documents"),
+    ("reporter", "✍️ Write the report", "the AI prose lives only here"),
+    ("critic", "🔬 Re-read and check", "any made-up numbers? send back"),
+    ("guardrails", "🛡️ Scrub personal info", "phones, emails, SSNs, cards"),
 ]
 NODE_LABEL = {n: (label, hint) for n, label, hint in NODE_ORDER}
 
-# Rich descriptions shown under the row of whichever agent is currently
-# running, so the viewer understands what each step is doing and why.
+# Plain-language description shown under the row of whichever step is
+# currently running, so a non-technical viewer understands what's actually
+# happening — no jargon, no acronyms.
 NODE_DESCRIPTIONS: dict[str, str] = {
     "schema_inspector": (
-        "Reads the workbook **structure only** — sheet names and headers, "
-        "not values — with the fast LLM. Decides which sheets carry "
-        "call-center KPIs (FCR, AHT, CSAT, abandon rate…) and which to "
-        "ignore (HR costs, payroll, real estate). Cheap and parallel-safe."
+        "Opens your Excel and figures out which sheets are about call-center "
+        "stats. If there's a sheet about HR salaries, office supplies, or real "
+        "estate, this step skips it. Only the sheets with relevant numbers "
+        "move forward to the next step."
     ),
     "extractor": (
-        "Pure pandas, **no LLM**. Pulls every numeric KPI out of the sheets "
-        "the inspector flagged as relevant. The number that lands in the "
-        "state is the number that was in the cell — there is no room for "
-        "the LLM to invent figures (see Challenge 1 in the README)."
+        "Pulls the actual numbers out of the sheets the previous step picked. "
+        "**This step has no AI in it** — it's a plain Python program. That's "
+        "the whole point: every number in the final report comes straight "
+        "from your Excel, the AI literally cannot change them later."
     ),
     "retriever": (
-        "Hybrid search across `data/benchmarks/*.md`: **BM25** for acronym "
-        "matching (FCR, AHT, NPS) + **dense FAISS** embeddings for "
-        "semantics, fused via RRF. Pre-filters by the selected industry; "
-        "falls back to cross-industry only when no industry-specific chunk "
-        "is found (and flags it in the output)."
+        "Looks up industry benchmark numbers in the reference documents "
+        "shipped with the project. For a banking client it opens the banking "
+        "handbook and pulls _“industry average abandon rate is 4%”_. If no "
+        "handbook exists for your industry, it falls back to cross-industry "
+        "averages and flags that in the report so the reader knows."
     ),
     "reporter": (
-        "Heavy LLM generates four focused structured-output sections **in "
-        "parallel** via `asyncio.gather`: executive prose, benchmark "
-        "comparisons with computed gap %, ROI projections, then citations "
-        "attributing claims back to the retrieved sources. Splitting the "
-        "schema into small pieces makes smaller models fill it reliably."
+        "**The biggest step.** An AI writes the actual report text — executive "
+        "summary, what's good vs bad, side-by-side comparison against the "
+        "industry, dollar estimates of savings from each potential fix, "
+        "concrete recommendations, and footnote-style citations back to the "
+        "source documents. Four sections written in parallel to save time."
     ),
     "critic": (
-        "Strict reviewer. Scores the report on **faithfulness** (claims "
-        "grounded in retrieved facts) and **numeric accuracy** (regex-checks "
-        "that every number is traceable). Below threshold → kicks Reporter "
-        "back for a rewrite, up to `max_reporter_attempts` (default 3). "
-        "This is the cycle that LangGraph buys us — chains can't loop."
+        "Re-reads what the writer just produced and asks two questions: _is "
+        "every claim supported by the source data?_ and _is any number in the "
+        "text not actually in the Excel or benchmarks?_ If not happy, sends "
+        "the report back for a rewrite. Up to three tries. After three, the "
+        "report is flagged _“human should look at this”_ instead of shipped."
     ),
     "guardrails": (
-        "Regex sweep for **PII** (phones, SSNs, emails, credit cards) — "
-        "anything sensitive gets redacted in-place. Plus a tone check. If "
-        "the Critic loop maxed out without passing the threshold, the "
-        "report is flagged for human review (HITL escalation)."
+        "Scrubs out any personal info that might have leaked into the text — "
+        "phone numbers, email addresses, social security numbers, credit "
+        "cards. Also finalises the _“needs human review”_ flag if the "
+        "checking step raised it."
     ),
 }
 
@@ -704,7 +747,7 @@ if run_button and source_bytes is not None:
     # keeps moving for the entire pipeline; the CSS spinner above moves
     # per-agent inside.
     pipeline_status = st.status(
-        "🚀 Running pipeline — six agents kicking off…", expanded=True, state="running"
+        "🚀 Running the analysis — see the steps below…", expanded=True, state="running"
     )
     with pipeline_status:
         st.markdown("**🗺️ Workflow**")
