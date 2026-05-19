@@ -60,3 +60,7 @@ eval/runs/
 
 # OS
 Thumbs.db
+
+# Local interview prep — never commit
+help.md
+interview_test.html

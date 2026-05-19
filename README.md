@@ -241,7 +241,7 @@ This POC was built with Claude as a pair programmer. Architecture decisions, age
 
 ## Author
 
-Sergey Chernyakov · [LinkedIn](https://www.linkedin.com/in/sergey-chernyakov-458506400/) · Backend / AI Engineering Lead
+Sergey Chernyakov · [LinkedIn](https://www.linkedin.com/in/sergey-chernyakov-458506400/) · [Telegram @imhotepus](https://t.me/imhotepus) · Backend / AI Engineering Lead
 
 Built in 7 days as a thought exercise for the **PwC AppDev Lead AI Engineer** role.
 
