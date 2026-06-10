@@ -44,58 +44,48 @@ st.set_page_config(
 
 st.title("📞 Contact Center Copilot")
 st.caption(
-    "Drop in an Excel of call-center stats — get back a one-minute report on "
-    "which numbers are below industry, what to fix first, and how much money "
-    "each fix would save."
+    "Excel of call-center stats → 1-minute report: what's worse than industry, "
+    "what to fix, what each fix would save."
 )
 
 with st.expander("💡 What is this? Why isn't it just ChatGPT?", expanded=True):
     st.markdown(
         """
-**What it does.** A call center has stats — what percent of issues get
-resolved on the first call, how long calls take on average, how satisfied
-customers are afterward, how many people give up before someone picks up.
-When a bank/retailer hires consultants (like PwC) to figure out why their
-call center isn't great, the consultant spends **2-3 weeks** comparing those
-stats against industry averages, calculating how much each problem is
-costing, and writing a 20-page report.
+**The job.** A consultant normally spends **2-3 weeks** comparing your
+call-center numbers to industry averages, costing each gap, and writing
+the report. This tool does it in **30 seconds**.
 
-**This tool does that in 30 seconds.** Drop in the Excel, click Run, get
-back a report with the same shape: which numbers are bad, by how much vs
-the industry, dollar estimates of savings from fixing each one, concrete
-recommendations, and citations to the source documents.
+**The trick** — three things ChatGPT alone can't do safely:
 
-**Why isn't it just ChatGPT?**
+1. **Numbers come from a plain Python program, not the AI** — so they
+   physically can't be hallucinated. The AI only writes the prose
+   _around_ fixed number slots.
+2. **Benchmarks come from pre-loaded reference documents** (with
+   citations), not the model's memory.
+3. **A second AI re-reads the report** and rejects any claim not backed
+   by the source. Up to 3 retries, then it flags _“needs human review”_
+   instead of shipping bad output.
 
-ChatGPT happily invents numbers. Ask it _“what's the FCR for this bank?”_
-and it might confidently say **73%** when your Excel says **68%**. In a
-client-facing report that's a fireable mistake.
-
-Here it's done differently:
-
-1. **The numbers in the report come straight from your Excel.** A plain
-   Python program extracts them — no AI in that step — so they physically
-   can't be altered by the model. The AI only writes prose _around_ fixed
-   number slots.
-2. **Industry benchmarks come from pre-loaded reference documents** shipped
-   with the project (with citations you can show the client), not from the
-   model's memory.
-3. **A second AI re-reads the report** and checks every claim against the
-   source data. If anything looks unsupported, the writer gets it back for
-   a rewrite — up to three tries. After three, the report is flagged
-   _“needs human review”_ rather than shipped quietly.
-
-So: **program counts → fetches verified benchmarks → AI writes the prose →
-AI re-reads itself → human reviews if uncertain.** Same job as a junior
-analyst, with auditability and no made-up numbers.
+So: **program counts → fetches benchmarks → AI writes prose →
+AI checks itself → human reviews if uncertain.**
 """
     )
 
-# Inject the spinner CSS once. The .ccpilot-spinner span replaces the static
-# ⏳ emoji on the row of whichever agent is currently running so the user
-# always sees actual motion, not a frozen icon.
+# Inject the spinner CSS + a base font-size bump. Streamlit's defaults are
+# noticeably small on a 1440p+ display; we bump body/markdown/captions/code
+# by ~15% so the page reads without a Cmd-= zoom.
 st.markdown(
     """<style>
+html, body, [class*="css"] { font-size: 17px; }
+.stMarkdown, .stMarkdown p, .stMarkdown li { font-size: 17px; line-height: 1.6; }
+.stMarkdown h1 { font-size: 30px !important; }
+.stMarkdown h2 { font-size: 24px !important; }
+.stMarkdown h3 { font-size: 20px !important; }
+[data-testid="stCaptionContainer"], .stCaption, small { font-size: 15px !important; }
+[data-testid="stExpander"] .stMarkdown,
+[data-testid="stExpander"] p,
+[data-testid="stExpander"] li { font-size: 17px; line-height: 1.65; }
+code, pre, kbd { font-size: 15px !important; }
 @keyframes ccpilot-spin { to { transform: rotate(360deg); } }
 .ccpilot-spinner {
   display: inline-block;
@@ -171,43 +161,29 @@ NODE_LABEL = {n: (label, hint) for n, label, hint in NODE_ORDER}
 # happening — no jargon, no acronyms.
 NODE_DESCRIPTIONS: dict[str, str] = {
     "schema_inspector": (
-        "Opens your Excel and figures out which sheets are about call-center "
-        "stats. If there's a sheet about HR salaries, office supplies, or real "
-        "estate, this step skips it. Only the sheets with relevant numbers "
-        "move forward to the next step."
+        "Picks which sheets to read — skips HR / payroll / supplies, keeps "
+        "anything with call-center numbers."
     ),
     "extractor": (
-        "Pulls the actual numbers out of the sheets the previous step picked. "
-        "**This step has no AI in it** — it's a plain Python program. That's "
-        "the whole point: every number in the final report comes straight "
-        "from your Excel, the AI literally cannot change them later."
+        "Pulls the numbers out with plain Python — **no AI**. This is what "
+        "guarantees no number in the final report is hallucinated."
     ),
     "retriever": (
-        "Looks up industry benchmark numbers in the reference documents "
-        "shipped with the project. For a banking client it opens the banking "
-        "handbook and pulls _“industry average abandon rate is 4%”_. If no "
-        "handbook exists for your industry, it falls back to cross-industry "
-        "averages and flags that in the report so the reader knows."
+        "Looks up industry benchmarks in the reference docs shipped with the "
+        "project. Falls back to cross-industry averages (with a flag) if your "
+        "industry isn't covered."
     ),
     "reporter": (
-        "**The biggest step.** An AI writes the actual report text — executive "
-        "summary, what's good vs bad, side-by-side comparison against the "
-        "industry, dollar estimates of savings from each potential fix, "
-        "concrete recommendations, and footnote-style citations back to the "
-        "source documents. Four sections written in parallel to save time."
+        "An AI writes the report text — exec summary, comparison, ROI "
+        "estimates, recommendations, citations. Four sections in parallel."
     ),
     "critic": (
-        "Re-reads what the writer just produced and asks two questions: _is "
-        "every claim supported by the source data?_ and _is any number in the "
-        "text not actually in the Excel or benchmarks?_ If not happy, sends "
-        "the report back for a rewrite. Up to three tries. After three, the "
-        "report is flagged _“human should look at this”_ instead of shipped."
+        "Re-reads the report and rejects unsupported claims or unverifiable "
+        "numbers. Up to 3 retries, then _“needs human review”_."
     ),
     "guardrails": (
-        "Scrubs out any personal info that might have leaked into the text — "
-        "phone numbers, email addresses, social security numbers, credit "
-        "cards. Also finalises the _“needs human review”_ flag if the "
-        "checking step raised it."
+        "Scrubs phones / emails / SSNs / credit cards if any leaked into the "
+        "text. Finalises the human-review flag."
     ),
 }
 

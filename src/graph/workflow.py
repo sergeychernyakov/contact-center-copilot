@@ -94,7 +94,8 @@ def _initial_state(excel_path: str, industry: str) -> CopilotState:
 
 async def run_pipeline(excel_path: str, industry: str = "cross_industry") -> CopilotState:
     """Convenience entry point — run the full pipeline end-to-end."""
-    return await WORKFLOW.ainvoke(_initial_state(excel_path, industry))  # type: ignore[no-any-return]
+    initial = _initial_state(excel_path, industry)
+    return await WORKFLOW.ainvoke(initial)  # type: ignore[no-any-return]
 
 
 async def run_pipeline_streaming(

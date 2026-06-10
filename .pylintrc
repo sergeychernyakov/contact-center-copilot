@@ -437,7 +437,16 @@ disable=raw-checker-failed,
         deprecated-pragma,
         use-symbolic-message-instead,
         use-implicit-booleaness-not-comparison-to-string,
-        use-implicit-booleaness-not-comparison-to-zero
+        use-implicit-booleaness-not-comparison-to-zero,
+        # Intentional patterns in this repo:
+        import-outside-toplevel,          # lazy provider imports in _llm.py / excel_extractor.py
+        duplicate-code,                   # shared lazy-singleton pattern (mcp_server / benchmark_retriever)
+        broad-exception-caught,           # UI / extractor defensive boundaries
+        too-many-branches,                # Streamlit script
+        too-many-locals,                  # Streamlit script
+        redefined-outer-name,             # Streamlit reruns: module-level vars shadow function locals
+        global-statement,                 # lazy singletons in benchmark_retriever / mcp_server
+        invalid-name                      # `is_sample`, `_retriever` at module level — runtime vars, not constants
 
 # Enable the message, report, category or checker with the given id(s). You can
 # either give multiple identifier separated by comma (,) or put this option

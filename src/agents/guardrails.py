@@ -97,6 +97,7 @@ async def apply_guardrails(state: CopilotState) -> dict:
     needs_review = (critic is not None and not critic.passes) or bool(tone_issues)
     if needs_review:
         cleaned.requires_human_review = True
+        # pylint: disable=no-member  # Pydantic v2 FieldInfo confuses pylint about list type
         if tone_issues:
             cleaned.review_reasons.append(f"Tone issues detected: {', '.join(tone_issues)}")
         if critic and not critic.passes:
